@@ -1272,6 +1272,56 @@ function sandNoise(x,y){
   return n - Math.floor(n);
 }
 
+function drawGuaranteedMoundBase(m){
+  ctx.save();
+  const baseGrad = ctx.createRadialGradient(m.cx, m.cy - m.r*0.18, m.r*0.12, m.cx, m.cy, m.r*1.04);
+  baseGrad.addColorStop(0, 'rgba(242,210,150,0.98)');
+  baseGrad.addColorStop(0.62, 'rgba(227,191,129,0.96)');
+  baseGrad.addColorStop(1, 'rgba(206,165,101,0.94)');
+  ctx.fillStyle = baseGrad;
+  ctx.beginPath();
+  ctx.ellipse(m.cx, m.cy, m.r*1.04, m.r*0.75, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawGuaranteedObjectBase(m){
+  if(!game.currentObj) return;
+  const maxH = Math.min(m.r*1.18, m.h*0.44);
+  const stemH = maxH*(game.currentObj.height || 1)*0.82;
+  const baseY = m.cy - m.r*0.03;
+  ctx.save();
+  ctx.translate(m.cx, baseY);
+  ctx.rotate(game.tiltX*0.9);
+  ctx.fillStyle = 'rgba(80,58,36,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, 22, 7, 0, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = game.currentObj.color || '#ff9a61';
+  const type = game.currentObj.type;
+  if(type==='flag'){
+    roundRect(ctx,-5,-stemH,10,stemH,5); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(4,-stemH+4); ctx.lineTo(42,-stemH+18); ctx.lineTo(4,-stemH+34); ctx.closePath(); ctx.fill();
+  }else if(type==='tower'){
+    roundRect(ctx,-18,-stemH,36,stemH,8); ctx.fill();
+  }else if(type==='rocket'){
+    ctx.fillRect(-10,-stemH*0.62,20,stemH*0.62);
+    ctx.beginPath(); ctx.moveTo(-14,-stemH*0.62); ctx.lineTo(14,-stemH*0.62); ctx.lineTo(0,-stemH); ctx.closePath(); ctx.fill();
+  }else if(type==='signal'){
+    roundRect(ctx,-5,-stemH,10,stemH,5); ctx.fill();
+    roundRect(ctx,-22,-stemH*0.82,44,28,7); ctx.fill();
+  }else if(type==='parasol' || type==='obake'){
+    roundRect(ctx,-4,-stemH,8,stemH,4); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,-stemH*0.8,28,18,0,Math.PI,0); ctx.fill();
+  }else if(type==='aspara'){
+    roundRect(ctx,-10,-stemH,20,stemH,10); ctx.fill();
+  }else{
+    roundRect(ctx,-6,-stemH,12,stemH,6); ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawMound(m){
   ctx.save();
   ctx.beginPath();
@@ -1608,8 +1658,10 @@ function loop(){
     game.shake *= .86;
   }
   drawBackground(m);
+  drawGuaranteedMoundBase(m);
   drawMound(m);
   drawMarks();
+  drawGuaranteedObjectBase(m);
   drawObject(m);
   drawRipples();
   drawParticles();
