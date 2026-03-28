@@ -713,6 +713,7 @@ const game = {
   tiltY:0,
   lean:0,
   currentObj:null,
+  initialSupportBase:82,
   touch:null,
   swipePreview:null,
   lastTouchTime:0,
@@ -744,6 +745,21 @@ function metrics(){
   return { w, h, cx:w*0.5, cy:h*0.83 - STAGE_LIFT_PX, r };
 }
 
+function computeInitialSupportBase(){
+  const c = (GRID-1)/2;
+  const radius = 7.2;
+  let total = 0;
+  for(let y=Math.floor(c-radius); y<=Math.ceil(c+radius); y++) {
+    for(let x=Math.floor(c-radius); x<=Math.ceil(c+radius); x++) {
+      if(x<0||y<0||x>=GRID||y>=GRID) continue;
+      const h = game.mound[y*GRID+x];
+      const w = Math.max(0, radius + 0.5 - Math.hypot(x-c, y-c));
+      total += h * w;
+    }
+  }
+  game.initialSupportBase = Math.max(0.001, total);
+}
+
 function initMound(){
   game.mound = new Array(GRID*GRID).fill(0);
   game.sandHistory = new Array(GRID*GRID).fill(0);
@@ -760,6 +776,7 @@ function initMound(){
       game.mound[y*GRID+x] = Math.max(0, Math.min(1, crater + ridge1 + ridge2 + noise));
     }
   }
+  computeInitialSupportBase();
 }
 
 function randomObject(){
@@ -784,7 +801,7 @@ function mapToGrid(x,y){
 
 function isForbidden(gx,gy){
   const c = (GRID-1)/2;
-  return Math.hypot(gx-c, gy-c) < 4.5;
+  return Math.hypot(gx-c, gy-c) < 3.7;
 }
 
 function spawnParticle(x,y,color,speed=3,life=1,size=3.4){
@@ -877,13 +894,14 @@ function showToast(msg, mode='normal'){
 
 function updatePhysics(){
   const c = (GRID-1)/2;
-  const radius = 5.5;
+  const radius = 7.2;
   let sx=0, sy=0, total=0;
   for(let y=Math.floor(c-radius);y<=Math.ceil(c+radius);y++){
     for(let x=Math.floor(c-radius);x<=Math.ceil(c+radius);x++){
       if(x<0||y<0||x>=GRID||y>=GRID) continue;
       const h = game.mound[y*GRID+x];
-      const w = Math.max(0, radius + 0.5 - Math.hypot(x-c,y-c));
+      const dist = Math.hypot(x-c,y-c);
+      const w = Math.max(0, radius + 0.5 - dist);
       sx += (x-c)*h*w;
       sy += (y-c)*h*w;
       total += h*w;
@@ -892,14 +910,14 @@ function updatePhysics(){
   total = Math.max(0.001,total);
   const mass = game.currentObj ? game.currentObj.mass : 1;
   const inst = game.currentObj ? game.currentObj.instability : 1;
-  game.tiltX = (sx/total)*0.088*mass*inst;
-  game.tiltY = (sy/total)*0.052*mass*inst;
+  game.tiltX = (sx/total)*0.118*mass*inst;
+  game.tiltY = (sy/total)*0.072*mass*inst;
   game.lean = Math.hypot(game.tiltX, game.tiltY);
-  const fullSupport = 82;
+  const fullSupport = Math.max(0.001, game.initialSupportBase || total);
   game.support = Math.max(0, Math.min(1, total/fullSupport));
   updateMetersUi();
   updateDangerUi();
-  if(game.support < 0.36 || game.lean > 0.74) triggerGameOver();
+  if(game.support < 0.52 || game.lean > 0.46) triggerGameOver();
 }
 
 function updateMetersUi(){
@@ -913,10 +931,10 @@ function updateMetersUi(){
   document.getElementById('supportText').className = 'meter-big' + (pct<42 ? ' low' : '');
   document.getElementById('meterCard').className = 'meter-card' + (pct<42 ? ' dangerBg' : '');
   let tag='まだ余裕あり', tagClass='', danger='静穏';
-  if(pct<72 || tiltDeg>3.5){ tag='少し気になる'; tagClass='warn'; danger='要注意'; }
-  if(pct<55 || tiltDeg>7.0){ tag='かなり危うい'; tagClass='warn'; danger='ぐらつき'; }
-  if(pct<42 || tiltDeg>11.0){ tag='倒れる寸前'; tagClass='crit'; danger='危険'; }
-  if(pct<36 || tiltDeg>14.0){ tag='もう限界'; tagClass='crit'; danger='崩壊寸前'; }
+  if(pct<84 || tiltDeg>2.2){ tag='少し気になる'; tagClass='warn'; danger='要注意'; }
+  if(pct<70 || tiltDeg>5.0){ tag='かなり危うい'; tagClass='warn'; danger='ぐらつき'; }
+  if(pct<58 || tiltDeg>8.2){ tag='倒れる寸前'; tagClass='crit'; danger='危険'; }
+  if(pct<52 || tiltDeg>10.8){ tag='もう限界'; tagClass='crit'; danger='崩壊寸前'; }
   const meterTag = document.getElementById('meterTag');
   meterTag.textContent = tag;
   meterTag.className = 'meter-tag ' + tagClass;
@@ -929,9 +947,9 @@ function updateDangerUi(){
   const pct = Math.round(game.support*100);
   const tiltDeg = Math.abs(game.lean*20.5);
   let level=0;
-  if(pct<72 || tiltDeg>3.5) level=1;
-  if(pct<55 || tiltDeg>7.0) level=2;
-  if(pct<42 || tiltDeg>11.0) level=3;
+  if(pct<84 || tiltDeg>2.2) level=1;
+  if(pct<70 || tiltDeg>5.0) level=2;
+  if(pct<58 || tiltDeg>8.2) level=3;
   game.dangerLevel = level;
   if(level>game.prevDangerLevel){
     audio.alert(level);
