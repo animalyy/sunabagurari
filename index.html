@@ -735,11 +735,13 @@ function resize(){
   ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
 
+const STAGE_LIFT_PX = 38;
+
 function metrics(){
   const w = canvas.clientWidth || canvas.parentElement.clientWidth;
   const h = canvas.clientHeight || canvas.parentElement.clientHeight;
   const r = Math.min(w,h) * 0.33;
-  return { w, h, cx:w*0.5, cy:h*0.83, r };
+  return { w, h, cx:w*0.5, cy:h*0.83 - STAGE_LIFT_PX, r };
 }
 
 function initMound(){
@@ -972,7 +974,7 @@ function updateTiltIndicator(){
 function digAtScreen(x,y,power,radius,kind,actorIndex,label){
   const {gx,gy,mx,my,dist} = mapToGrid(x,y);
   const {r} = metrics();
-  if(dist > r*1.3) return false;
+  if(dist > r*1.52) return false;
   const targetRadius = radius + (kind==='tap' ? 0.6 : 1.3);
   let changed=false, totalRemoved=0;
   for(let dy=-Math.ceil(targetRadius);dy<=Math.ceil(targetRadius);dy++){
@@ -1047,6 +1049,7 @@ function triggerGameOver(){
   pushLog(texts[game.currentObj.type] || `${loser.name}が倒した。`);
   updateTurnUi();
   const alive = game.players.filter(p=>p.alive);
+  game.phase = alive.length > 1 ? 'between' : 'finished';
   setTimeout(()=>{
     let title, desc;
     if(alive.length<=1){
@@ -1056,10 +1059,11 @@ function triggerGameOver(){
       desc = winner ? `${winner.name}が最後まで倒さず残りました。\n通算 ${winner.wins} 勝目です。` : 'みんな崩れ落ちました。';
     }else{
       title = `${loser.name}が倒した`;
-      desc = `${alive.length}人が残っています。次のラウンドへ。`;
+      desc = `${alive.length}人が残っています。砂山を整えて、次の回戦へ進みます。`;
     }
     document.getElementById('menuTitle').textContent = title;
     document.getElementById('menuDesc').textContent = desc;
+    updateStartButtonLabel();
     document.getElementById('menu').classList.remove('hidden');
   },650);
 }
@@ -1077,7 +1081,7 @@ function completeTurn(text){
     updateTurnUi();
     const p = game.players[game.turn];
     audio.turn(p.type);
-    showBanner(`${p.name}の番`);
+    showBanner(`${p.name}の番`, p.type === 'human' ? 'rgba(255,154,97,.92)' : 'rgba(91,63,41,.92)');
     showToast(p.type === 'human' ? `【${p.name}】の番です。外側から静かに攻めましょう。` : `【${p.name}】の番です。色の跡から狙いを読んでください。`, p.type === 'human' ? 'accent' : 'normal');
     if(p.type !== 'human') game.pendingCpuTimer = setTimeout(()=>cpuMove(game.turn), 720);
   },860);
@@ -1199,9 +1203,12 @@ function executeAction(actorIndex,kind,x1,y1,x2,y2,cpu=false){
 }
 
 function getPoint(e){
-  if(e.changedTouches && e.changedTouches[0]) return e.changedTouches[0];
-  if(e.touches && e.touches[0]) return e.touches[0];
-  return e;
+  const src = (e.changedTouches && e.changedTouches[0]) || (e.touches && e.touches[0]) || e;
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: src.clientX - rect.left,
+    y: src.clientY - rect.top
+  };
 }
 
 function resetInput(){
@@ -1210,18 +1217,18 @@ function resetInput(){
 }
 
 function onStart(e){
-  if(!game.running || game.over || game.players[game.turn].type !== 'human') return;
+  if(!game.running || game.over || !game.players[game.turn].alive || game.players[game.turn].type !== 'human') return;
   const now = Date.now();
   if(!e.touches && now-game.lastTouchTime < 440) return;
   const t = getPoint(e);
-  game.touch = {x1:t.clientX,y1:t.clientY,x2:t.clientX,y2:t.clientY,time:now};
+  game.touch = {x1:t.x,y1:t.y,x2:t.x,y2:t.y,time:now};
 }
 
 function onMove(e){
   if(!game.touch) return;
   const t = getPoint(e);
-  game.touch.x2 = t.clientX;
-  game.touch.y2 = t.clientY;
+  game.touch.x2 = t.x;
+  game.touch.y2 = t.y;
   const dx = game.touch.x2-game.touch.x1;
   const dy = game.touch.y2-game.touch.y1;
   const dist = Math.hypot(dx,dy);
@@ -1627,18 +1634,26 @@ function startRound(){
   clearEphemeral();
   initMound();
   randomObject();
-  game.over=false; game.turn=0; game.running=true;
+  game.phase='playing';
+  game.over=false; game.running=true;
   game.support=1; game.tiltX=0; game.tiltY=0; game.lean=0;
   game.shake=0; game.pulse=0; game.dangerLevel=0; game.prevDangerLevel=0;
   document.getElementById('stageArea').className='stage-area';
   document.getElementById('dangerOverlay').className='danger-overlay';
   document.getElementById('menu').classList.add('hidden');
-  document.getElementById('log').innerHTML='';
+  const log = document.getElementById('log');
+  if(game.round === 1 || log.children.length===0) log.innerHTML='';
+  appendRoundDivider(`${game.round}回戦`);
   updateMetersUi();
   updateTurnUi();
   pushLog(`${game.currentObj.name}を設置した。`);
-  showBanner('あなたから開始', 'rgba(255,154,97,.95)');
-  showToast(UI_TEXT.YOUR_TURN, 'accent');
+  const current = game.players[game.turn];
+  showBanner(`${current.name}から開始`, current.type === 'human' ? 'rgba(255,154,97,.95)' : 'rgba(91,63,41,.95)');
+  showToast(current.type === 'human' ? UI_TEXT.YOUR_TURN : `【${current.name}】から始まります。`, current.type === 'human' ? 'accent' : 'normal');
+  updateStartButtonLabel();
+  if(current.type !== 'human'){
+    game.pendingCpuTimer = setTimeout(()=>cpuMove(game.turn), 720);
+  }
 }
 
 function showHint(){
@@ -1663,16 +1678,42 @@ function showHint(){
 const startBtn = document.getElementById('startBtn');
 const restartBtn = document.getElementById('restartBtn');
 const hintBtn = document.getElementById('hintBtn');
-startBtn.addEventListener('click', ()=>{
-  audio.init();
+
+function resetTournament(){
   game.players.forEach(p=>p.alive=true);
-  if(game.running || game.over) game.round += 1;
+  game.turn = 0;
+  game.round = 1;
+  game.currentObj = null;
+  game.phase = 'title';
+  clearEphemeral();
+}
+
+function firstAliveIndex(){
+  const idx = game.players.findIndex(p=>p.alive);
+  return idx >= 0 ? idx : 0;
+}
+
+function continueOrStart(){
+  audio.init();
+  const aliveCount = game.players.filter(p=>p.alive).length;
+  if(game.phase === 'title'){
+    game.round = 1;
+    game.turn = firstAliveIndex();
+  } else if(game.phase === 'between' && aliveCount > 1){
+    game.round += 1;
+    game.turn = nextAliveIndex(game.turn);
+  } else {
+    resetTournament();
+    game.turn = firstAliveIndex();
+  }
   startRound();
-});
+}
+
+startBtn.addEventListener('click', continueOrStart);
 restartBtn.addEventListener('click', ()=>{
   audio.init();
-  game.players.forEach(p=>p.alive=true);
-  game.round += 1;
+  resetTournament();
+  game.turn = firstAliveIndex();
   startRound();
 });
 hintBtn.addEventListener('click', ()=>{ audio.init(); showHint(); });
@@ -1680,6 +1721,8 @@ canvas.addEventListener('touchstart', e=>{ if(e.cancelable) e.preventDefault(); 
 canvas.addEventListener('touchmove', e=>{ if(e.cancelable) e.preventDefault(); onMove(e); }, {passive:false});
 canvas.addEventListener('touchend', onEnd);
 canvas.addEventListener('touchcancel', resetInput);
+window.addEventListener('touchend', onEnd, {passive:false});
+window.addEventListener('touchcancel', resetInput, {passive:false});
 canvas.addEventListener('mousedown', e=>{ audio.init(); onStart(e); });
 window.addEventListener('mousemove', onMove);
 window.addEventListener('mouseup', onEnd);
@@ -1693,6 +1736,7 @@ resize();
 initMound();
 updateMetersUi();
 updateTurnUi();
+updateStartButtonLabel();
 loop();
 })();
 </script>
