@@ -730,22 +730,18 @@ const game = {
 
 function resize(){
   const rect = canvas.parentElement.getBoundingClientRect();
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  canvas.width = Math.round(rect.width * devicePixelRatio);
+  canvas.height = Math.round(rect.height * devicePixelRatio);
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
 }
 
-const STAGE_LIFT_PX = 24;
+const STAGE_LIFT_PX = 38;
 
 function metrics(){
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const w = rect.width || canvas.clientWidth || canvas.parentElement.clientWidth || 320;
-  const h = rect.height || canvas.clientHeight || canvas.parentElement.clientHeight || 320;
-  const r = Math.min(w,h) * 0.29;
-  return { w, h, cx:w*0.5, cy:h*0.78 - STAGE_LIFT_PX, r };
+  const w = canvas.clientWidth || canvas.parentElement.clientWidth;
+  const h = canvas.clientHeight || canvas.parentElement.clientHeight;
+  const r = Math.min(w,h) * 0.33;
+  return { w, h, cx:w*0.5, cy:h*0.83 - STAGE_LIFT_PX, r };
 }
 
 function initMound(){
@@ -1053,7 +1049,6 @@ function triggerGameOver(){
   pushLog(texts[game.currentObj.type] || `${loser.name}が倒した。`);
   updateTurnUi();
   const alive = game.players.filter(p=>p.alive);
-  game.phase = alive.length > 1 ? 'between' : 'finished';
   setTimeout(()=>{
     let title, desc;
     if(alive.length<=1){
@@ -1067,7 +1062,7 @@ function triggerGameOver(){
     }
     document.getElementById('menuTitle').textContent = title;
     document.getElementById('menuDesc').textContent = desc;
-    updateStartButtonLabel();
+    document.getElementById('startBtn').textContent = alive.length > 1 ? '次へ' : 'もう一度';
     document.getElementById('menu').classList.remove('hidden');
   },650);
 }
@@ -1085,7 +1080,7 @@ function completeTurn(text){
     updateTurnUi();
     const p = game.players[game.turn];
     audio.turn(p.type);
-    showBanner(`${p.name}の番`, p.type === 'human' ? 'rgba(255,154,97,.92)' : 'rgba(91,63,41,.92)');
+    showBanner(`${p.name}の番`);
     showToast(p.type === 'human' ? `【${p.name}】の番です。外側から静かに攻めましょう。` : `【${p.name}】の番です。色の跡から狙いを読んでください。`, p.type === 'human' ? 'accent' : 'normal');
     if(p.type !== 'human') game.pendingCpuTimer = setTimeout(()=>cpuMove(game.turn), 720);
   },860);
@@ -1270,56 +1265,6 @@ function drawBackground(m){
 function sandNoise(x,y){
   const n = Math.sin(x*12.9898 + y*78.233) * 43758.5453;
   return n - Math.floor(n);
-}
-
-function drawGuaranteedMoundBase(m){
-  ctx.save();
-  const baseGrad = ctx.createRadialGradient(m.cx, m.cy - m.r*0.18, m.r*0.12, m.cx, m.cy, m.r*1.04);
-  baseGrad.addColorStop(0, 'rgba(242,210,150,0.98)');
-  baseGrad.addColorStop(0.62, 'rgba(227,191,129,0.96)');
-  baseGrad.addColorStop(1, 'rgba(206,165,101,0.94)');
-  ctx.fillStyle = baseGrad;
-  ctx.beginPath();
-  ctx.ellipse(m.cx, m.cy, m.r*1.04, m.r*0.75, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawGuaranteedObjectBase(m){
-  if(!game.currentObj) return;
-  const maxH = Math.min(m.r*1.18, m.h*0.44);
-  const stemH = maxH*(game.currentObj.height || 1)*0.82;
-  const baseY = m.cy - m.r*0.03;
-  ctx.save();
-  ctx.translate(m.cx, baseY);
-  ctx.rotate(game.tiltX*0.9);
-  ctx.fillStyle = 'rgba(80,58,36,0.18)';
-  ctx.beginPath();
-  ctx.ellipse(0, 4, 22, 7, 0, 0, Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle = game.currentObj.color || '#ff9a61';
-  const type = game.currentObj.type;
-  if(type==='flag'){
-    roundRect(ctx,-5,-stemH,10,stemH,5); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(4,-stemH+4); ctx.lineTo(42,-stemH+18); ctx.lineTo(4,-stemH+34); ctx.closePath(); ctx.fill();
-  }else if(type==='tower'){
-    roundRect(ctx,-18,-stemH,36,stemH,8); ctx.fill();
-  }else if(type==='rocket'){
-    ctx.fillRect(-10,-stemH*0.62,20,stemH*0.62);
-    ctx.beginPath(); ctx.moveTo(-14,-stemH*0.62); ctx.lineTo(14,-stemH*0.62); ctx.lineTo(0,-stemH); ctx.closePath(); ctx.fill();
-  }else if(type==='signal'){
-    roundRect(ctx,-5,-stemH,10,stemH,5); ctx.fill();
-    roundRect(ctx,-22,-stemH*0.82,44,28,7); ctx.fill();
-  }else if(type==='parasol' || type==='obake'){
-    roundRect(ctx,-4,-stemH,8,stemH,4); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(0,-stemH*0.8,28,18,0,Math.PI,0); ctx.fill();
-  }else if(type==='aspara'){
-    roundRect(ctx,-10,-stemH,20,stemH,10); ctx.fill();
-  }else{
-    roundRect(ctx,-6,-stemH,12,stemH,6); ctx.fill();
-  }
-  ctx.restore();
 }
 
 function drawMound(m){
@@ -1658,10 +1603,8 @@ function loop(){
     game.shake *= .86;
   }
   drawBackground(m);
-  drawGuaranteedMoundBase(m);
   drawMound(m);
   drawMarks();
-  drawGuaranteedObjectBase(m);
   drawObject(m);
   drawRipples();
   drawParticles();
@@ -1690,23 +1633,19 @@ function startRound(){
   clearEphemeral();
   initMound();
   randomObject();
-  game.phase='playing';
   game.over=false; game.running=true;
   game.support=1; game.tiltX=0; game.tiltY=0; game.lean=0;
   game.shake=0; game.pulse=0; game.dangerLevel=0; game.prevDangerLevel=0;
   document.getElementById('stageArea').className='stage-area';
   document.getElementById('dangerOverlay').className='danger-overlay';
   document.getElementById('menu').classList.add('hidden');
-  const log = document.getElementById('log');
-  if(game.round === 1 || log.children.length===0) log.innerHTML='';
-  appendRoundDivider(`${game.round}回戦`);
+  document.getElementById('log').innerHTML='';
   updateMetersUi();
   updateTurnUi();
   pushLog(`${game.currentObj.name}を設置した。`);
   const current = game.players[game.turn];
   showBanner(`${current.name}から開始`, current.type === 'human' ? 'rgba(255,154,97,.95)' : 'rgba(91,63,41,.95)');
   showToast(current.type === 'human' ? UI_TEXT.YOUR_TURN : `【${current.name}】から始まります。`, current.type === 'human' ? 'accent' : 'normal');
-  updateStartButtonLabel();
   if(current.type !== 'human'){
     game.pendingCpuTimer = setTimeout(()=>cpuMove(game.turn), 720);
   }
@@ -1739,9 +1678,6 @@ function resetTournament(){
   game.players.forEach(p=>p.alive=true);
   game.turn = 0;
   game.round = 1;
-  game.currentObj = null;
-  game.phase = 'title';
-  clearEphemeral();
 }
 
 function firstAliveIndex(){
@@ -1752,14 +1688,20 @@ function firstAliveIndex(){
 function continueOrStart(){
   audio.init();
   const aliveCount = game.players.filter(p=>p.alive).length;
-  if(game.phase === 'title'){
-    game.round = 1;
+  const shouldContinue = game.over && aliveCount > 1;
+  if(!game.running && !game.over && game.round === 1 && aliveCount === game.players.length && !game.currentObj){
     game.turn = firstAliveIndex();
-  } else if(game.phase === 'between' && aliveCount > 1){
+  } else if(shouldContinue){
     game.round += 1;
     game.turn = nextAliveIndex(game.turn);
-  } else {
+  } else if(game.over && aliveCount <= 1){
     resetTournament();
+    game.turn = firstAliveIndex();
+  } else if(game.running || game.currentObj){
+    game.round += 1;
+    resetTournament();
+    game.turn = firstAliveIndex();
+  } else {
     game.turn = firstAliveIndex();
   }
   startRound();
@@ -1777,8 +1719,6 @@ canvas.addEventListener('touchstart', e=>{ if(e.cancelable) e.preventDefault(); 
 canvas.addEventListener('touchmove', e=>{ if(e.cancelable) e.preventDefault(); onMove(e); }, {passive:false});
 canvas.addEventListener('touchend', onEnd);
 canvas.addEventListener('touchcancel', resetInput);
-window.addEventListener('touchend', onEnd, {passive:false});
-window.addEventListener('touchcancel', resetInput, {passive:false});
 canvas.addEventListener('mousedown', e=>{ audio.init(); onStart(e); });
 window.addEventListener('mousemove', onMove);
 window.addEventListener('mouseup', onEnd);
@@ -1792,7 +1732,6 @@ resize();
 initMound();
 updateMetersUi();
 updateTurnUi();
-updateStartButtonLabel();
 loop();
 })();
 </script>
