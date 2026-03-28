@@ -730,18 +730,22 @@ const game = {
 
 function resize(){
   const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = Math.round(rect.width * devicePixelRatio);
-  canvas.height = Math.round(rect.height * devicePixelRatio);
-  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+  canvas.width = Math.max(1, Math.round(rect.width * dpr));
+  canvas.height = Math.max(1, Math.round(rect.height * dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 
-const STAGE_LIFT_PX = 38;
+const STAGE_LIFT_PX = 24;
 
 function metrics(){
-  const w = canvas.clientWidth || canvas.parentElement.clientWidth;
-  const h = canvas.clientHeight || canvas.parentElement.clientHeight;
-  const r = Math.min(w,h) * 0.33;
-  return { w, h, cx:w*0.5, cy:h*0.83 - STAGE_LIFT_PX, r };
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width || canvas.clientWidth || canvas.parentElement.clientWidth || 320;
+  const h = rect.height || canvas.clientHeight || canvas.parentElement.clientHeight || 320;
+  const r = Math.min(w,h) * 0.29;
+  return { w, h, cx:w*0.5, cy:h*0.78 - STAGE_LIFT_PX, r };
 }
 
 function initMound(){
